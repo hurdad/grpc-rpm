@@ -1,5 +1,5 @@
 # grpc-rpm
-version = 1.26.0
+version = 1.34.0
 release = 1
 name = grpc
 full_name = $(name)-$(version)
@@ -9,6 +9,9 @@ all: rpm
 
 clean:
 	rm -rf rpmbuild
+	rm -rf grpc
+	rm -rf $(full_name)
+	rm -rf $(full_name).tar.gz
 
 mkdir: clean
 	mkdir -p rpmbuild
@@ -19,7 +22,11 @@ mkdir: clean
 	mkdir -p rpmbuild/SRPMS
 
 download: mkdir
-	curl -L -o rpmbuild/SOURCES/$(full_name).tar.gz $(download_url); 
+	git clone --recursive https://github.com/grpc/grpc.git
+	mv grpc $(full_name)
+	cd $(full_name) && git checkout v$(version)
+	tar -czvf $(full_name).tar.gz $(full_name)
+	cp $(full_name).tar.gz rpmbuild/SOURCES/$(full_name).tar.gz
 
 rpm: download
 	rpmbuild $(RPM_OPTS) \

@@ -1,3 +1,4 @@
+%global debug_package %{nil}
 Name: grpc
 Version:	%{VERSION}
 Release:        %{RELEASE}%{?dist}
@@ -11,10 +12,10 @@ BuildRequires: pkgconfig
 BuildRequires: protobuf-devel
 BuildRequires: protobuf-compiler
 BuildRequires: openssl-devel
-BuildRequires: gflags-devel
-BuildRequires: gtest-devel
+BuildRequires: re2-devel
+BuildRequires: abseil-cpp-devel
+BuildRequires: google-benchmark-devel
 BuildRequires: zlib-devel
-BuildRequires: gperftools-devel
 
 %description
 gRPC is a modern open source high performance RPC framework that can run in any
@@ -62,24 +63,33 @@ Development headers and files for gRPC libraries.
 %prep
 %autosetup -N
 
-sed -i 's:^prefix ?= .*:prefix ?= %{_prefix}:' Makefile
-sed -i 's:$(prefix)/lib:$(prefix)/%{_lib}:' Makefile
-sed -i 's:^GTEST_LIB =.*::' Makefile
+#fix pkgconfig path
+sed -i 's:lib/pkgconfig:lib64/pkgconfig:' CMakeLists.txt
 
 %build
-%make_build shared plugins
-
-# build python module
-export GRPC_PYTHON_BUILD_WITH_CYTHON=True
-export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=True
-export GRPC_PYTHON_BUILD_SYSTEM_CARES=True
-export CFLAGS="%optflags"
+mkdir -p cmake/build
+pushd cmake/build
+cmake ../.. -DCMAKE_INSTALL_PREFIX=/usr  \
+	-DBUILD_SHARED_LIBS=ON 		 \
+	-DCMAKE_BUILD_TYPE=Release       \
+	-DgRPC_INSTALL=ON           	 \
+	-DgRPC_BUILD_TESTS=ON		 \
+	-DgRPC_INSTALL_LIBDIR=lib64	 \
+	-DgRPC_ABSL_PROVIDER=package     \
+	-DgRPC_CARES_PROVIDER=package    \
+	-DgRPC_PROTOBUF_PROVIDER=package \
+	-DgRPC_RE2_PROVIDER=package      \
+	-DgRPC_SSL_PROVIDER=package      \
+	-DgRPC_ZLIB_PROVIDER=package	 \
+	-DgRPC_BENCHMARK_PROVIDER=package \
+	-DgRPC_INSTALL_CMAKEDIR=lib64/cmake/grpc
+make %{?_smp_mflags}
+popd
 
 %install
-make install prefix="%{buildroot}%{_prefix}"
-make install-grpc-cli prefix="%{buildroot}%{_prefix}"
-find %{buildroot} -type f -name '*.a' -exec rm -f {} \;
+pushd cmake/build
+make install DESTDIR=%{buildroot}
+cp grpc_cli %{buildroot}%{_bindir}
 
 %post 
 ldconfig
@@ -90,17 +100,18 @@ ldconfig
 %files
 %doc README.md
 %license LICENSE
-%{_libdir}/libaddress_sorting.so.9*
-%{_libdir}/libgpr.so.9*
+%{_libdir}/libaddress_sorting.so.14*
+%{_libdir}/libgpr.so.14*
 %{_libdir}/libgrpc++.so.1*
 %{_libdir}/libgrpc++_error_details.so.1*
 %{_libdir}/libgrpc++_reflection.so.1*
 %{_libdir}/libgrpc++_unsecure.so.1*
-%{_libdir}/libgrpc.so.9*
-%{_libdir}/libgrpc_cronet.so.9*
-%{_libdir}/libgrpc_unsecure.so.9*
+%{_libdir}/libgrpc++_alts.so.1*
+%{_libdir}/libgrpc.so.14*
+%{_libdir}/libgrpc_unsecure.so.14*
+%{_libdir}/libgrpc_plugin_support.so.1*
 %{_libdir}/libgrpcpp_channelz.so.1*
-%{_libdir}/libup*.so.9*
+%{_libdir}/libup*.so.14*
 %{_datadir}/grpc
 
 %files cli
@@ -118,12 +129,14 @@ ldconfig
 %{_libdir}/libgrpc++_error_details.so
 %{_libdir}/libgrpc++_reflection.so
 %{_libdir}/libgrpc++_unsecure.so
+%{_libdir}/libgrpc++_alts.so
 %{_libdir}/libgrpc.so
-%{_libdir}/libgrpc_cronet.so
 %{_libdir}/libgrpc_unsecure.so
+%{_libdir}/libgrpc_plugin_support.so
 %{_libdir}/libgrpcpp_channelz.so
 %{_libdir}/libupb.so
 %{_libdir}/pkgconfig/*
+%{_libdir}/cmake/grpc/
 %{_includedir}/grpc
 %{_includedir}/grpc++
 %{_includedir}/grpcpp
